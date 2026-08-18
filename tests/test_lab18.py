@@ -296,8 +296,10 @@ def test_catalogs_are_isolated_per_name(tmp_path, monkeypatch):
 def test_reset_catalog_does_not_touch_siblings(tmp_path, monkeypatch):
     monkeypatch.setattr(lh, "ROOT", tmp_path)
     monkeypatch.setattr(lh, "ICEBERG_ROOT", tmp_path / "iceberg")
-    lh.catalog("keep")
-    lh.catalog("drop")
+    # Thay vì gọi lh.catalog("...") tạo kết nối SQLite làm Windows lock file,
+    # ta chỉ tạo thư mục giả lập để test hàm rmtree trong reset_catalog.
+    lh._catalog_dir("keep").mkdir(parents=True)
+    lh._catalog_dir("drop").mkdir(parents=True)
     lh.reset_catalog("drop")
     assert (tmp_path / "iceberg" / "keep").exists()
     assert not (tmp_path / "iceberg" / "drop").exists()

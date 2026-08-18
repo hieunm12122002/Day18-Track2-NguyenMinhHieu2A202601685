@@ -2,11 +2,23 @@
 ## Two paths: lightweight (default, pure Python) and Spark (Docker, optional).
 
 VENV       := .venv
-PY         := $(VENV)/bin/python
-PIP        := $(VENV)/bin/pip
-JUPYTER    := $(VENV)/bin/jupyter
-JUPYTEXT   := $(VENV)/bin/jupytext
-PYTEST     := $(VENV)/bin/pytest
+ifeq ($(OS),Windows_NT)
+    BIN := $(VENV)\Scripts
+    DEVNULL := NUL
+    PY := $(BIN)\python
+    PIP := $(BIN)\pip
+    JUPYTER := $(BIN)\jupyter
+    JUPYTEXT := $(BIN)\jupytext
+    PYTEST := $(BIN)\pytest
+else
+    BIN := $(VENV)/bin
+    DEVNULL := /dev/null
+    PY := $(BIN)/python
+    PIP := $(BIN)/pip
+    JUPYTER := $(BIN)/jupyter
+    JUPYTEXT := $(BIN)/jupytext
+    PYTEST := $(BIN)/pytest
+endif
 COMPOSE    := docker compose -f docker/docker-compose.yml
 
 .DEFAULT_GOAL := help
@@ -20,12 +32,11 @@ help: ## Show this help
 # ─────────────────────────────────────────────────────────────
 
 setup: ## [lite] Create venv + install deps (~180 MB, ~20s with pip / ~4s with uv)
-	@command -v uv >/dev/null 2>&1 && uv venv $(VENV) --python '>=3.10,<3.15' || python3 -m venv $(VENV)
-	@$(PY) -c 'import sys; raise SystemExit(0 if (3,10)<=sys.version_info[:2]<(3,15) else 1)' \
-	  || { echo "ERROR: need Python 3.10-3.14. Install 'uv' (auto-fetches one) or run: python3.12 -m venv .venv"; exit 1; }
-	@command -v uv >/dev/null 2>&1 && uv pip install --python $(PY) -r requirements.txt \
-	  || $(PIP) install -q -r requirements.txt
-	@$(JUPYTEXT) --to notebook --update notebooks/*.py 2>/dev/null || $(JUPYTEXT) --to notebook notebooks/*.py
+	@python -m venv $(VENV)
+	@$(PY) -c "import sys; raise SystemExit(0 if (3,10)<=sys.version_info[:2]<(3,15) else 1)" || (echo ERROR: need Python 3.10-3.14 & exit 1)
+	@$(PIP) install -q -r requirements.txt
+	-@$(JUPYTEXT) --to notebook --update notebooks/*.py 2>$(DEVNULL)
+	-@$(JUPYTEXT) --to notebook notebooks/*.py 2>$(DEVNULL)
 	@echo ""
 	@echo "  ✓ Setup complete. Run 'make smoke' then 'make lab'."
 
@@ -36,7 +47,7 @@ test: ## [lite] Run the pytest suite the instructor grades against
 	@$(PYTEST) -q
 
 lab: ## [lite] Open Jupyter Lab on http://localhost:8888
-	@$(JUPYTEXT) --to notebook --update notebooks/*.py 2>/dev/null || true
+	-@$(JUPYTEXT) --to notebook --update notebooks/*.py 2>$(DEVNULL)
 	@$(JUPYTER) lab --notebook-dir=notebooks --ServerApp.token='' --no-browser
 
 data: ## [lite] Generate 200K-row Bronze sample for NB4
